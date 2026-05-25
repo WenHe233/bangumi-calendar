@@ -1,0 +1,2077 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新番时间表</title>
+    <!-- PWA Configuration -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/cn2t.js"></script>
+    <style>
+        /* --- 核心变量 --- */
+        :root {
+            --bg-color: #000;
+            --accent-blue: #5bc0de;
+            --accent-orange: #f0ad4e;
+            --text-main: #eee;
+            --text-dim: #aaa;
+            --glass-bg: rgba(30, 30, 30, 0.85);
+            --border-light: rgba(255, 255, 255, 0.15);
+
+            /* 品牌色 */
+            --color-bangumi: #f09199;
+            /* Bangumi 粉 */
+            --color-bilibili: #fb7299;
+            --color-iqiyi: #00cc36;
+            --color-qq: #ff7e00;
+            --color-gamer: #13c2c2;
+            --color-muse: #e60012;
+            --color-ani-one: #ffcd00;
+        }
+
+        body {
+            margin: 0;
+            padding: 10px;
+            background-color: var(--bg-color);
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            color: var(--text-main);
+            font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+            font-size: 14px;
+            min-height: 100vh;
+        }
+
+        #app {
+            max-width: 1000px;
+            margin: 0 auto 30px;
+            padding: 0 15px;
+            position: relative;
+        }
+
+        /* --- 控制面板 --- */
+        .control-panel {
+            background: var(--glass-bg);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .mode-switcher,
+        .config-group {
+            display: flex;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 3px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .mode-switcher:hover,
+        .config-group:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 8px rgba(91, 192, 222, 0.2);
+        }
+
+        .mode-btn {
+            padding: 6px 18px;
+            cursor: pointer;
+            border-radius: 3px;
+            color: #888;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            font-size: 0.9em;
+            user-select: none;
+        }
+
+        .mode-btn:hover {
+            color: #ccc;
+        }
+
+        .mode-btn.active {
+            background: var(--accent-blue);
+            color: #111;
+            box-shadow: 0 0 15px rgba(91, 192, 222, 0.3);
+        }
+
+        .config-group {
+            gap: 8px;
+            padding: 3px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* --- 控制面板 --- */
+        .control-panel {
+            position: relative;
+            background: rgba(30, 30, 30, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            border: 1px solid var(--border-light);
+            z-index: 100;
+        }
+
+        /* Header Controls Wrapper */
+        .header-controls {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 10px;
+            /* Push control panel down */
+            position: relative;
+            z-index: 200;
+            width: auto;
+        }
+
+        .mobile-filter-trigger {
+            display: none;
+            /* Hidden on desktop */
+            cursor: pointer;
+            padding: 8px 12px;
+            background: rgba(30, 30, 30, 0.8);
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            color: var(--accent-blue);
+            font-size: 0.9em;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .lang-selector-container {
+            display: flex;
+            justify-content: flex-end;
+            position: relative;
+            /* z-index handled by parent or self */
+        }
+
+        .lang-current {
+            cursor: pointer;
+            color: #888;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .lang-current:hover {
+            color: var(--accent-blue);
+            background: rgba(30, 30, 30, 0.8);
+            border-color: #444;
+        }
+
+        /* --- Generic Custom Select --- */
+        .c-select {
+            position: relative;
+            display: inline-block;
+            min-width: 140px;
+            font-size: 0.9em;
+            user-select: none;
+        }
+
+        .c-select-trigger {
+            cursor: pointer;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 6px 12px;
+            color: #ccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .c-select-trigger:hover,
+        .c-select.active .c-select-trigger {
+            border-color: var(--accent-blue);
+            color: #fff;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .c-select-trigger .val {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 120px;
+            /* Limit width */
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .c-select-options {
+            position: absolute;
+            top: calc(100% + 5px);
+            left: 0;
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 4px;
+            z-index: 200;
+            display: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .c-select-options.show {
+            display: block;
+            animation: fadeIn 0.1s ease-out;
+        }
+
+        .c-select-option {
+            padding: 8px 12px;
+            color: #aaa;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .c-select-option:hover {
+            background: var(--accent-blue);
+            color: #fff;
+        }
+
+        .c-select-option.selected {
+            color: var(--accent-blue);
+            font-weight: bold;
+        }
+
+        .c-select-option.selected:hover {
+            color: #fff;
+        }
+
+        .c-select-option.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            pointer-events: none;
+            background: rgba(255, 0, 0, 0.05);
+            /* Optional: slight tint to indicate unavailable */
+            background: rgba(255, 0, 0, 0.05);
+            /* Optional: slight tint to indicate unavailable */
+        }
+
+        .c-select-option.checkbox {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .c-select-option.checkbox::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border: 1px solid #666;
+            border-radius: 2px;
+            margin-left: 10px;
+            transition: 0.2s;
+        }
+
+        .c-select-option.checkbox.selected::after {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            box-shadow: inset 0 0 0 2px #222;
+        }
+
+        /* Scrollbar for options */
+        .c-select-options::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .c-select-options::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        .c-select-options::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 3px;
+        }
+
+        .c-select-options::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+
+        .lang-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 5px 0;
+            min-width: 120px;
+            display: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            margin-top: 5px;
+        }
+
+        .lang-dropdown.show {
+            display: block;
+            animation: fadeIn 0.1s ease-out;
+        }
+
+        .lang-option {
+            padding: 8px 15px;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: 0.2s;
+            text-align: left;
+        }
+
+        .lang-option:hover {
+            background: var(--accent-blue);
+            color: #fff;
+        }
+
+        .lang-option.active {
+            color: var(--accent-blue);
+            font-weight: bold;
+        }
+
+        .lang-option.active:hover {
+            color: #fff;
+        }
+
+
+
+        /* Mobile Layout Optimization */
+        @media (max-width: 1100px) {
+            .header-controls {
+                position: relative;
+                /* Reset absolute on mobile */
+                top: auto;
+                right: auto;
+                justify-content: space-between;
+                /* Filter Left, Lang Right */
+                margin-bottom: 10px;
+                width: 100%;
+            }
+
+            .mobile-filter-trigger {
+                display: flex;
+                /* Show filter button */
+            }
+
+            .mobile-filter-trigger {
+                display: flex;
+                /* Show filter button */
+            }
+
+            .control-panel {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                width: 100%;
+                /* Ensure full width */
+                box-sizing: border-box;
+                /* Include padding/border in width */
+                z-index: 1001;
+                /* Highest */
+                flex-direction: column;
+                align-items: stretch;
+                gap: 15px;
+                padding: 20px;
+                padding-bottom: calc(20px + env(safe-area-inset-bottom));
+                border-radius: 16px 16px 0 0;
+                background: #1e1e1e;
+                border: 1px solid #333;
+                border-bottom: none;
+                box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.7);
+
+                transform: translateY(110%);
+                /* Hidden by default */
+                transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                margin-bottom: 0;
+            }
+
+            .control-panel .c-select-options {
+                top: auto;
+                bottom: calc(100% + 5px);
+                max-height: 250px;
+            }
+
+            .control-panel.show {
+                transform: translateY(0);
+            }
+
+            /* Adjust controls inside drawer */
+            .mode-switcher,
+            .config-group {
+                margin-bottom: 5px;
+                /* Spacing */
+            }
+
+            .mode-switcher,
+            .filter-controls,
+            .config-group {
+                width: 100%;
+                justify-content: center;
+                box-sizing: border-box;
+            }
+
+            .filter-controls {
+                display: flex;
+                gap: 5px;
+            }
+
+            .filter-controls .c-select {
+                flex: 1;
+                min-width: 0;
+                /* Allow shrinking */
+            }
+
+            .filter-controls .c-select-trigger {
+                padding: 6px 4px;
+                /* Tighter padding */
+                /* Font size reverted to default */
+            }
+
+            .filter-controls .c-select-trigger svg {
+                margin-left: 2px;
+                min-width: 10px;
+                /* Don't squash icon */
+            }
+
+            .mode-switcher,
+            .config-group {
+                width: 100%;
+                display: flex;
+                /* Ensure flex */
+                justify-content: space-between;
+                /* Distribute */
+                gap: 10px;
+                box-sizing: border-box;
+            }
+
+            .mode-switcher .mode-btn,
+            .config-group .mode-btn,
+            .config-group div {
+                flex: 1;
+                /* Equal width 50/50 */
+                width: 0;
+                /* Fix flex overflow */
+                text-align: center;
+                white-space: nowrap;
+                /* Prevent wrap */
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
+            color: #ccc;
+            font-size: 0.9em;
+        }
+
+        .checkbox-label:hover {
+            color: var(--text-main);
+        }
+
+        .checkbox-label input {
+            accent-color: var(--accent-blue);
+        }
+
+        /* --- 选择框 --- */
+        .filter-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .filter-controls select {
+            appearance: none;
+            -webkit-appearance: none;
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-main);
+            padding: 8px 35px 8px 15px;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235bc0de' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 14px;
+        }
+
+        select:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 8px rgba(91, 192, 222, 0.2);
+        }
+
+        select option {
+            background-color: #222;
+            color: #eee;
+            padding: 10px;
+        }
+
+        .desc-text {
+            color: #888;
+            font-size: 0.85em;
+            font-family: monospace;
+        }
+
+        /* --- 星期导航 --- */
+        .nav-days {
+            display: flex;
+            justify-content: space-between;
+            background: var(--glass-bg);
+            padding: 5px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            position: sticky;
+            top: 10px;
+            z-index: 90;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+        }
+
+        .nav-day {
+            flex: 1;
+            text-align: center;
+            cursor: pointer;
+            padding: 10px 0;
+            color: var(--text-dim);
+            transition: 0.2s;
+            border-radius: 2px;
+            font-weight: 500;
+        }
+
+        .nav-day:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .nav-day.active {
+            color: #111;
+            background: var(--accent-blue);
+            font-weight: bold;
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- 列表与样式 --- */
+        .schedule-group {
+            display: none;
+        }
+
+        .schedule-group.active {
+            display: block;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .anime-item {
+            display: flex;
+            align-items: center;
+            background: rgba(30, 30, 30, 0.6);
+            margin-bottom: 8px;
+            padding: 12px 15px;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 2px;
+        }
+
+        /* Drawer Backdrop */
+        /* Drawer Backdrop */
+        .drawer-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            /* Slightly darker */
+            z-index: 999;
+            display: none;
+            backdrop-filter: blur(5px);
+            /* Add blur */
+            -webkit-backdrop-filter: blur(5px);
+            /* Safari support */
+            transition: opacity 0.3s;
+        }
+
+        .drawer-backdrop.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .anime-item:hover {
+            background: rgba(50, 50, 50, 0.9);
+            border-left: 3px solid var(--accent-orange);
+            transform: translateX(5px);
+        }
+
+        .anime-item.future-ep {
+            opacity: 0.5;
+            background: rgba(20, 20, 20, 0.4);
+            border: 1px dashed rgba(255, 255, 255, 0.1);
+            border-left: 3px solid transparent;
+        }
+
+        .anime-item.future-ep:hover {
+            opacity: 0.8;
+            border-left: 3px solid #666;
+            background: rgba(30, 30, 30, 0.6);
+        }
+
+        .anime-time {
+            font-family: 'Roboto Mono', 'Consolas', monospace, sans-serif;
+            font-size: 1.4em;
+            color: var(--accent-blue);
+            width: 62px;
+            margin-right: 8px;
+            font-weight: bold;
+            flex-shrink: 0;
+            text-align: left;
+        }
+
+        .anime-title {
+            flex-grow: 1;
+            font-size: 1.1em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* --- 时间分割线 --- */
+        .timeline-separator {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            color: var(--accent-orange);
+            font-size: 0.75em;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(240, 173, 78, 0.4);
+            animation: fadeIn 0.5s ease;
+        }
+
+        .timeline-separator::before,
+        .timeline-separator::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-orange), transparent);
+            opacity: 0.6;
+        }
+
+        .timeline-separator span {
+            padding: 1px 8px;
+            background: rgba(240, 173, 78, 0.15);
+            border: 1px solid rgba(240, 173, 78, 0.3);
+            border-radius: 12px;
+            color: var(--accent-orange);
+            margin: 0 10px;
+        }
+
+        /* --- 弹窗与按钮 --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-content {
+            background: #1a1a1a;
+            border: 1px solid var(--accent-blue);
+            width: 90%;
+            max-width: 600px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 40px rgba(91, 192, 222, 0.15);
+            animation: popIn 0.2s ease-out;
+            border-radius: 4px;
+        }
+
+        @keyframes popIn {
+            from {
+                transform: scale(0.95);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            padding: 15px 20px;
+            background: rgba(91, 192, 222, 0.1);
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: var(--accent-blue);
+        }
+
+        .modal-close {
+            cursor: pointer;
+            font-size: 1.8em;
+            line-height: 0.8;
+            color: #888;
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            gap: 20px;
+        }
+
+        .modal-cover {
+            width: 140px;
+            height: 200px;
+            background: #000;
+            object-fit: cover;
+            flex-shrink: 0;
+            border: 1px solid #333;
+        }
+
+        .modal-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .btn-group {
+            margin-top: auto;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        /* 基础按钮样式 */
+        .btn {
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #555;
+            color: #ddd;
+            text-decoration: none;
+            font-size: 0.85em;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #333;
+            border-color: #777;
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        /* 播放源特定颜色 */
+        .btn-bangumi {
+            border-color: var(--color-bangumi);
+            color: var(--color-bangumi);
+        }
+
+        .btn-bangumi:hover {
+            background: var(--color-bangumi);
+            color: #fff;
+        }
+
+        .btn-bilibili {
+            border-color: var(--color-bilibili);
+            color: var(--color-bilibili);
+        }
+
+        .btn-bilibili:hover {
+            background: var(--color-bilibili);
+            color: #fff;
+        }
+
+        .btn-gamer {
+            border-color: var(--color-gamer);
+            color: var(--color-gamer);
+        }
+
+        .btn-gamer:hover {
+            background: var(--color-gamer);
+            color: #fff;
+        }
+
+        .btn-muse {
+            border-color: var(--color-muse);
+            color: var(--color-muse);
+        }
+
+        .btn-muse:hover {
+            background: var(--color-muse);
+            color: #fff;
+        }
+
+        .btn-ani-one {
+            border-color: var(--color-ani-one);
+            color: var(--color-ani-one);
+        }
+
+        .btn-ani-one:hover {
+            background: var(--color-ani-one);
+            color: #000;
+        }
+
+        .btn-iqiyi {
+            border-color: var(--color-iqiyi);
+            color: var(--color-iqiyi);
+        }
+
+        .btn-iqiyi:hover {
+            background: var(--color-iqiyi);
+            color: #fff;
+        }
+
+        .btn-qq {
+            border-color: var(--color-qq);
+            color: var(--color-qq);
+        }
+
+        .btn-qq:hover {
+            background: var(--color-qq);
+            color: #fff;
+        }
+
+        .loading-container {
+            text-align: center;
+            padding: 50px 0;
+            color: var(--text-dim);
+        }
+
+        /* --- 页脚 --- */
+        .app-footer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            margin-top: 40px;
+            padding: 20px;
+            border-top: 1px solid var(--border-light);
+            color: var(--text-dim);
+            font-size: 0.9em;
+        }
+
+        .footer-link {
+            color: var(--text-dim);
+            text-decoration: none;
+            transition: color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .footer-link:hover {
+            color: var(--accent-blue);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app">
+        <div class="header-controls">
+            <div class="mobile-filter-trigger" id="mobileFilterBtn" onclick="toggleDrawer()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                </svg>
+                <span data-i18n="filter_btn">筛选</span>
+            </div>
+
+            <!-- Custom PWA Install Button -->
+            <div id="btnInstallPWA" class="mobile-filter-trigger" style="display: none; margin-right: 10px;"
+                onclick="installPWA()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>安装</span>
+            </div>
+
+            <div class="lang-selector-container">
+                <div class="lang-current" onclick="toggleLangMenu(event)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; opacity:0.8;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path
+                            d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+                        </path>
+                    </svg>
+                    <span id="currentLangText">简体中文</span>
+                    <svg width="10" height="6" viewBox="0 0 10 6" fill="currentColor"
+                        style="margin-left:8px; opacity:0.5;">
+                        <path d="M5 6L0 0h10z" />
+                    </svg>
+                </div>
+                <div class="lang-dropdown" id="langDropdown">
+                    <div class="lang-option" onclick="selectLang('zh-Hans')" data-val="zh-Hans">简体中文</div>
+                    <div class="lang-option" onclick="selectLang('zh-Hant')" data-val="zh-Hant">繁體中文</div>
+                    <div class="lang-option" onclick="selectLang('en')" data-val="en">English</div>
+                    <div class="lang-option" onclick="selectLang('ja')" data-val="ja">日本語</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+
+            <div class="mode-switcher">
+                <div id="btnModeSeasonal" class="mode-btn active" onclick="setMode('seasonal')"
+                    data-i18n="tab_seasonal">季度索引</div>
+                <div id="btnModeBroadcast" class="mode-btn" onclick="setMode('broadcast')" data-i18n="tab_broadcast">
+                    当前热播</div>
+            </div>
+
+            <div id="seasonalControls" class="filter-controls">
+                <!-- Custom Year Select -->
+                <div class="c-select" id="cSelYear">
+                    <div class="c-select-trigger" onclick="toggleCustomSelect('cSelYear')">
+                        <span class="val">2026年</span>
+                        <svg width="10" height="6" viewBox="0 0 10 6" fill="currentColor" style="opacity:0.5">
+                            <path d="M5 6L0 0h10z" />
+                        </svg>
+                    </div>
+                    <div class="c-select-options"></div>
+                </div>
+
+                <!-- Custom Season Select -->
+                <div class="c-select" id="cSelSeason">
+                    <div class="c-select-trigger" onclick="toggleCustomSelect('cSelSeason')">
+                        <span class="val">1月 - 冬季新番</span>
+                        <svg width="10" height="6" viewBox="0 0 10 6" fill="currentColor" style="opacity:0.5">
+                            <path d="M5 6L0 0h10z" />
+                        </svg>
+                    </div>
+                    <div class="c-select-options">
+                        <div class="c-select-option" onclick="selectCustomOption('cSelSeason', 1)" data-v="1">1月 - 冬季新番
+                        </div>
+                        <div class="c-select-option" onclick="selectCustomOption('cSelSeason', 2)" data-v="2">4月 - 春季新番
+                        </div>
+                        <div class="c-select-option" onclick="selectCustomOption('cSelSeason', 3)" data-v="3">7月 - 夏季新番
+                        </div>
+                        <div class="c-select-option" onclick="selectCustomOption('cSelSeason', 4)" data-v="4">10月 - 秋季新番
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Type Selector (Multi-select) -->
+                <div class="c-select" id="cSelType">
+                    <div class="c-select-trigger" onclick="toggleCustomSelect('cSelType')">
+                        <span class="val" data-i18n="filter_label">类型</span>
+                        <svg width="10" height="6" viewBox="0 0 10 6" fill="currentColor" style="opacity:0.5">
+                            <path d="M5 6L0 0h10z" />
+                        </svg>
+                    </div>
+                    <div class="c-select-options">
+                        <div class="c-select-option checkbox" onclick="toggleTypeFilter('tv')" data-v="tv"
+                            data-i18n="type_tv">TV动画</div>
+                        <div class="c-select-option checkbox" onclick="toggleTypeFilter('web')" data-v="web"
+                            data-i18n="type_web">Web动画</div>
+                        <div class="c-select-option checkbox" onclick="toggleTypeFilter('movie')" data-v="movie"
+                            data-i18n="type_movie">剧场版</div>
+                        <div class="c-select-option checkbox" onclick="toggleTypeFilter('ova')" data-v="ova"
+                            data-i18n="type_ova">OVA/OAD</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="broadcastControls" class="desc-text" style="display:none;"></div>
+
+            <div class="config-group">
+                <div id="btn30h" class="mode-btn" onclick="toggle30h()" data-i18n="btn_30h">30小时制</div>
+                <div id="btnRetain" class="mode-btn" onclick="toggleRetain()"
+                    style="display:none; font-size: 0.85em; padding: 6px 12px;" data-i18n="btn_retain">保留当天0-6点动画
+                </div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading-container">
+            <h2 style="color: var(--accent-blue);">SYSTEM INITIALIZING</h2>
+            <div id="loadingText">Connecting to Database...</div>
+        </div>
+
+        <div class="nav-days" id="navDays" style="display:none">
+            <div class="nav-day" onclick="switchDay(1)">MON</div>
+            <div class="nav-day" onclick="switchDay(2)">TUE</div>
+            <div class="nav-day" onclick="switchDay(3)">WED</div>
+            <div class="nav-day" onclick="switchDay(4)">THU</div>
+            <div class="nav-day" onclick="switchDay(5)">FRI</div>
+            <div class="nav-day" onclick="switchDay(6)">SAT</div>
+            <div class="nav-day" onclick="switchDay(0)">SUN</div>
+        </div>
+
+        <div id="listContainer"></div>
+
+        <footer class="app-footer">
+            Data Source provided by
+            <a href="https://github.com/bangumi-data/bangumi-data" target="_blank" class="footer-link">
+                <!-- SVG Icon for GitHub -->
+                <svg height="16" viewBox="0 0 16 16" width="16" fill="currentColor">
+                    <path
+                        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z">
+                    </path>
+                </svg>
+                bangumi-data
+            </a>
+        </footer>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="mTitle"></div>
+                <div class="modal-close" onclick="closeModal()">&times;</div>
+            </div>
+            <div class="modal-body">
+                <img id="mCover" class="modal-cover" src="">
+                <div class="modal-info">
+                    <div id="mMeta" style="color:var(--accent-orange); font-size:0.9em; margin-bottom:10px;"></div>
+                    <div id="mDesc"
+                        style="color:#ccc; line-height:1.6; font-size:0.95em; max-height:200px; overflow-y:auto;"></div>
+                    <div class="btn-group" id="mButtons"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <div class="drawer-backdrop" id="drawerBackdrop" onclick="toggleDrawer()"></div>
+    </div>
+
+    <script>
+        // PWA Service Worker Registration
+
+        // PWA & Service Worker Logic
+        let deferredPrompt;
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW Registered'))
+                    .catch(err => console.log('SW Failed', err));
+            });
+        }
+
+
+
+    </script>
+
+    <script>
+        var DATA_URL = "https://unpkg.com/bangumi-data@0.3/dist/data.json";
+        var SEASON_TOLERANCE = 10;
+        var BROADCAST_DAYS = 95;
+
+        // --- 播放源配置 ---
+        var SITE_META = {
+            "bilibili": { "title": "Bilibili", "urlTemplate": "https://www.bilibili.com/bangumi/media/md{{id}}/", "css": "btn-bilibili" },
+            "bilibili_hk_mo_tw": { "title": "Bilibili (港澳台)", "urlTemplate": "https://www.bilibili.com/bangumi/media/md{{id}}/", "css": "btn-bilibili" },
+            "bilibili_tw": { "title": "Bilibili (台)", "urlTemplate": "https://www.bilibili.com/bangumi/media/md{{id}}/", "css": "btn-bilibili" },
+            "iqiyi": { "title": "爱奇艺", "urlTemplate": "https://www.iqiyi.com/{{id}}.html", "css": "btn-iqiyi" },
+            "qq": { "title": "腾讯视频", "urlTemplate": "https://v.qq.com/detail/{{id}}.html", "css": "btn-qq" },
+            "youku": { "title": "优酷", "urlTemplate": "https://list.youku.com/show/id_z{{id}}.html" },
+            "mgtv": { "title": "芒果TV", "urlTemplate": "https://www.mgtv.com/h/{{id}}.html" },
+            "gamer": { "title": "动画疯", "urlTemplate": "https://acg.gamer.com.tw/acgDetail.php?s={{id}}", "css": "btn-gamer" },
+            "muse_hk": { "title": "木棉花 (港)", "urlTemplate": "https://www.youtube.com/playlist?list={{id}}", "css": "btn-muse" },
+            "muse_tw": { "title": "木棉花 (台)", "urlTemplate": "https://www.youtube.com/playlist?list={{id}}", "css": "btn-muse" },
+            "ani_one": { "title": "Ani-One", "urlTemplate": "https://www.youtube.com/playlist?list={{id}}", "css": "btn-ani-one" },
+            "netflix": { "title": "Netflix", "urlTemplate": "https://www.netflix.com/title/{{id}}" },
+            "youtube": { "title": "YouTube", "urlTemplate": "https://www.youtube.com/playlist?list={{id}}" }
+        };
+
+        // OpenCC Converter Cache
+        var openccConverter = null;
+
+        // I18N Configuration
+        var currentLang = 'zh-Hans';
+        var I18N = {
+            'zh-Hans': {
+                'tab_seasonal': '季度索引',
+                'tab_broadcast': '当前热播',
+                'btn_30h': '30小时制',
+                'btn_retain': '保留当天0-6点动画',
+                'status_on': '开',
+                'status_off': '关',
+                'week_days': ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+                'seasons': ['冬季新番', '春季新番', '夏季新番', '秋季新番'],
+                'months': ['1月', '4月', '7月', '10月'],
+                'now': 'NOW / 当前时间',
+                'ended': 'NOW / 所有节目已播放',
+                'loading': '正在连接数据库...',
+                'processing': '正在处理数据...',
+                'error': '失败: ',
+                'footer_text': '数据源提供: ',
+                'modal_official': '官方网站',
+                'modal_begin': '首播: ',
+                'unknown': '未知',
+                'no_data': '无数据',
+                'no_desc': '暂无简介',
+                'broadcast_desc': '显示最近 {{days}} 天内开播的在播番剧',
+                'year_suffix': '年',
+                'type_tv': 'TV动画',
+                'type_web': 'Web动画',
+                'type_movie': '剧场版',
+                'type_ova': 'OVA/OAD',
+                'filter_label': '类型',
+                'filter_btn': '筛选',
+                'rating_label': '评分'
+            },
+            'zh-Hant': {
+                'tab_seasonal': '季度索引',
+                'tab_broadcast': '現正熱播',
+                'btn_30h': '30小時制',
+                'btn_retain': '保留當日0-6點動畫',
+                'status_on': '開',
+                'status_off': '關',
+                'week_days': ['週日', '週一', '週二', '週三', '週四', '週五', '週六'],
+                'seasons': ['冬季新番', '春季新番', '夏季新番', '秋季新番'],
+                'months': ['1月', '4月', '7月', '10月'],
+                'now': 'NOW / 當前時間',
+                'ended': 'NOW / 所有節目已播放',
+                'loading': '正在連線資料庫...',
+                'processing': '正在處理資料...',
+                'error': '失敗: ',
+                'footer_text': '資料來源: ',
+                'modal_official': '官方網站',
+                'modal_begin': '首播: ',
+                'unknown': '未知',
+                'no_data': '無數據',
+                'no_desc': '暫無簡介',
+                'broadcast_desc': '顯示最近 {{days}} 天內開播的在播番劇',
+                'year_suffix': '年',
+                'type_tv': 'TV動畫',
+                'type_web': 'Web動畫',
+                'type_movie': '劇場版',
+                'type_ova': 'OVA/OAD',
+                'filter_label': '類型',
+                'filter_btn': '篩選',
+                'rating_label': '評分'
+            },
+            'en': {
+                'tab_seasonal': 'Seasonal',
+                'tab_broadcast': 'On Air',
+                'btn_30h': '30h Mode',
+                'btn_retain': 'Extend Day (0-6am)',
+                'status_on': 'ON',
+                'status_off': 'OFF',
+                'week_days': ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'],
+                'seasons': ['Winter', 'Spring', 'Summer', 'Autumn'],
+                'months': ['Jan', 'Apr', 'Jul', 'Oct'],
+                'now': 'NOW',
+                'ended': 'Ended',
+                'loading': 'Connecting to Database...',
+                'processing': 'Processing Data...',
+                'error': 'Failed: ',
+                'footer_text': 'Data Source provided by ',
+                'modal_official': 'Official Site',
+                'modal_begin': 'Premiere: ',
+                'unknown': 'Unknown',
+                'no_data': 'No Data',
+                'no_desc': 'No Summary',
+                'broadcast_desc': 'Show anime broadcast within the last {{days}} days',
+                'year_suffix': '',
+                'type_tv': 'TV',
+                'type_web': 'Web',
+                'type_movie': 'Movie',
+                'type_ova': 'OVA',
+                'filter_label': 'Type',
+                'filter_btn': 'Filter',
+                'rating_label': 'Score'
+            },
+            'ja': {
+                'tab_seasonal': '季節一覧',
+                'tab_broadcast': '放送中',
+                'btn_30h': '30時間制',
+                'btn_retain': '当日分も表示',
+                'status_on': 'ON',
+                'status_off': 'OFF',
+                'week_days': ['日', '月', '火', '水', '木', '金', '土'],
+                'seasons': ['冬アニメ', '春アニメ', '夏アニメ', '秋アニメ'],
+                'months': ['1月', '4月', '7月', '10月'],
+                'now': 'NOW / 現在時刻',
+                'ended': 'NOW / 放送終了',
+                'loading': 'データベースに接続中...',
+                'processing': 'データ処理中...',
+                'error': '失敗: ',
+                'footer_text': 'データソース: ',
+                'modal_official': '公式サイト',
+                'modal_begin': '放送開始: ',
+                'unknown': '不明',
+                'no_data': 'データなし',
+                'no_desc': '概要なし',
+                'broadcast_desc': '直近 {{days}} 日以内に放送開始されたアニメを表示',
+                'year_suffix': '年',
+                'type_tv': 'TVアニメ',
+                'type_web': 'Webアニメ',
+                'type_movie': '劇場版',
+                'type_ova': 'OVA/OAD',
+                'filter_label': 'タイプ',
+                'filter_btn': 'フィルター'
+            }
+        };
+
+        var rawItems = [];
+        var currentMode = 'seasonal';
+        var groupedData = {};
+        var fullItemsMap = {};
+        var yearDataMap = {}; // { 2024: [1, 2, 3, 4], ... }
+        var filterTypes = ['tv', 'web']; // Default filter
+
+
+        function getWeekRange() {
+            var now = new Date();
+            var currentDay = now.getDay();
+            var jsDay = currentDay === 0 ? 7 : currentDay;
+            var mondayTime = now.getTime() - (jsDay - 1) * 24 * 60 * 60 * 1000;
+            var mondayDate = new Date(mondayTime);
+            mondayDate.setHours(0, 0, 0, 0);
+            return mondayDate;
+        }
+
+        function initControls() {
+            var now = new Date();
+            var currentMonth = now.getMonth() + 1;
+
+            // Season Defaults
+            var seasonVal = 1;
+            if (currentMonth >= 4) seasonVal = 2;
+            if (currentMonth >= 7) seasonVal = 3;
+            if (currentMonth >= 10) seasonVal = 4;
+
+            // Initial UI Update for Season
+            selectCustomOption('cSelSeason', seasonVal, false); // false = no trigger applyFilter yet
+        }
+
+        // Generic Toggle
+        window.toggleCustomSelect = function (id) {
+            if (window.event) window.event.stopPropagation();
+            // Close others first
+            document.querySelectorAll('.c-select-options').forEach(function (el) {
+                if (el.parentElement.id !== id) el.classList.remove('show');
+            });
+            var container = document.getElementById(id);
+            var opts = container.querySelector('.c-select-options');
+            opts.classList.toggle('show');
+            container.classList.toggle('active');
+        };
+
+        // Generic Select
+        window.selectCustomOption = function (containerId, value, triggerFilter) {
+            if (window.event) window.event.stopPropagation();
+            var container = document.getElementById(containerId);
+            container.dataset.value = value;
+
+            // Update Trigger Text
+            var opts = container.querySelectorAll('.c-select-option');
+            var selectedText = "";
+            opts.forEach(function (opt) {
+                if (opt.dataset.v == value) {
+                    opt.classList.add('selected');
+                    selectedText = opt.innerText;
+                } else {
+                    opt.classList.remove('selected');
+                }
+            });
+            container.querySelector('.c-select-trigger .val').innerText = selectedText;
+
+            // Close
+            container.querySelector('.c-select-options').classList.remove('show');
+            container.classList.remove('active');
+
+            if (containerId === 'cSelYear') {
+                updateSeasonAvailability(value);
+            }
+
+            if (triggerFilter !== false) applyFilter();
+        };
+
+        // Populate Years dynamically
+        function populateYearOptions(minYear, maxYear, selectedYear) {
+            var container = document.getElementById('cSelYear');
+            var optsContainer = container.querySelector('.c-select-options');
+            optsContainer.innerHTML = ''; // Clear
+
+            var suffix = I18N[currentLang]['year_suffix'] || '';
+
+            for (var y = maxYear; y >= minYear; y--) {
+                var div = document.createElement('div');
+                div.className = 'c-select-option';
+                div.innerText = y + suffix;
+                div.dataset.v = y;
+
+                // Check availability
+                if (!yearDataMap[y] || yearDataMap[y].size === 0) {
+                    div.classList.add('disabled');
+                }
+
+                // Closure for click
+                (function (val) {
+                    div.onclick = function () { selectCustomOption('cSelYear', val); };
+                })(y);
+                optsContainer.appendChild(div);
+            }
+            // Select current
+            selectCustomOption('cSelYear', selectedYear, false);
+        }
+
+        function updateSeasonAvailability(year) {
+            var sContainer = document.getElementById('cSelSeason');
+            if (!sContainer) return;
+            var opts = sContainer.querySelectorAll('.c-select-option');
+
+            var seasons = yearDataMap[year] || new Set();
+
+            opts.forEach(function (opt) {
+                var val = parseInt(opt.dataset.v);
+                if (seasons.has(val)) {
+                    opt.classList.remove('disabled');
+                } else {
+                    opt.classList.add('disabled');
+                }
+            });
+
+            // If current selected season is now disabled, should we switch? 
+            // Maybe switch to the first available one?
+            var curVal = parseInt(sContainer.dataset.value);
+            if (!seasons.has(curVal) && seasons.size > 0) {
+                // Auto switch to first available (e.g. earliest or latest?)
+                // Let's pick the first one found in 1..4
+                var firstAvail = 1;
+                if (seasons.has(1)) firstAvail = 1;
+                else if (seasons.has(2)) firstAvail = 2;
+                else if (seasons.has(3)) firstAvail = 3;
+                else if (seasons.has(4)) firstAvail = 4;
+
+                selectCustomOption('cSelSeason', firstAvail, true);
+            }
+        }
+
+        window.toggleDrawer = function () {
+            var panel = document.querySelector('.control-panel');
+            var back = document.getElementById('drawerBackdrop');
+            if (panel) panel.classList.toggle('show');
+            if (back) back.classList.toggle('show');
+        };
+
+        window.toggleTypeFilter = function (type) {
+            if (window.event) window.event.stopPropagation();
+
+            var index = filterTypes.indexOf(type);
+            if (index > -1) {
+                filterTypes.splice(index, 1);
+            } else {
+                filterTypes.push(type);
+            }
+            // Update UI
+            updateTypeSelectorUI();
+            // Apply verify
+            applyFilter();
+            saveSettings();
+        };
+
+        function updateTypeSelectorUI() {
+            var container = document.getElementById('cSelType');
+            if (!container) return;
+            var opts = container.querySelectorAll('.c-select-option');
+
+            var selectedNames = [];
+
+            // Sync checkbox state
+            opts.forEach(function (opt) {
+                var v = opt.dataset.v;
+                if (filterTypes.indexOf(v) > -1) {
+                    opt.classList.add('selected');
+                    selectedNames.push(opt.innerText);
+                } else {
+                    opt.classList.remove('selected');
+                }
+            });
+
+            // Update Trigger Text
+            var label = "";
+            if (selectedNames.length === 0) {
+                // Should show default label
+                // Get label from i18n
+                label = I18N[currentLang]['filter_label'] || 'Type';
+            } else {
+                label = selectedNames.join(', ');
+            }
+
+            container.querySelector('.c-select-trigger .val').innerText = label;
+        }
+
+        function updateCustomLangUI() {
+            // Update Text
+            var textMap = {
+                'zh-Hans': '简体中文',
+                'zh-Hant': '繁體中文',
+                'en': 'English',
+                'ja': '日本語'
+            };
+            var txt = document.getElementById('currentLangText');
+            if (txt) txt.innerText = textMap[currentLang] || 'Language';
+
+            // Update Active State
+            var opts = document.querySelectorAll('.lang-option');
+            opts.forEach(function (opt) {
+                if (opt.getAttribute('data-val') === currentLang) {
+                    opt.classList.add('active');
+                } else {
+                    opt.classList.remove('active');
+                }
+            });
+        }
+
+        function initCustomLang() {
+            updateCustomLangUI();
+
+            // Global Click for Closing Dropdowns
+            document.addEventListener('click', function (e) {
+                // Close Language Menu
+                var langContainer = document.querySelector('.lang-selector-container');
+                if (langContainer && !langContainer.contains(e.target)) {
+                    var arr = document.getElementById('langDropdown');
+                    if (arr) arr.classList.remove('show');
+                }
+
+                // Close Custom Selects
+                document.querySelectorAll('.c-select').forEach(function (el) {
+                    if (!el.contains(e.target)) {
+                        el.querySelector('.c-select-options').classList.remove('show');
+                        el.classList.remove('active');
+                    }
+                });
+            });
+        }
+
+        window.toggleLangMenu = function (e) {
+            e.stopPropagation();
+            var menu = document.getElementById('langDropdown');
+            menu.classList.toggle('show');
+        };
+
+        window.selectLang = function (lang) {
+            changeLanguage(lang);
+            document.getElementById('langDropdown').classList.remove('show');
+        };
+
+        function init() {
+            loadSettings(); // Load user preferences
+            initControls();
+            initCustomLang();
+
+            var loadingText = document.getElementById('loadingText');
+            loadingText.innerText = I18N[currentLang]['loading']; // Initial translate
+
+            fetch(DATA_URL)
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    rawItems = data.items;
+                    loadingText.innerText = I18N[currentLang]['processing'];
+
+                    // Calculate Year Range
+                    yearDataMap = {};
+                    var minYear = new Date().getFullYear();
+                    var maxYear = minYear;
+
+                    rawItems.forEach(function (item) {
+                        var d = item.begin;
+                        if (d) {
+                            var dateObj = new Date(d);
+                            var y = dateObj.getFullYear();
+                            if (!isNaN(y)) {
+                                if (!yearDataMap[y]) yearDataMap[y] = new Set();
+                                var m = dateObj.getMonth(); // 0-11
+                                var s = Math.floor(m / 3) + 1; // 1-4
+                                yearDataMap[y].add(s);
+
+                                if (y < minYear) minYear = y;
+                                if (y > maxYear) maxYear = y;
+                            }
+                        }
+                    });
+
+                    // Ensure current year is in map (customary, though maybe empty)
+                    // If strict data is empty, maybe we shouldn't? user said "if no data.. unselectable".
+                    // But if we remove it from map, it becomes unselectable. That's fine.
+
+                    if (Object.keys(yearDataMap).length > 0) {
+                        // min/max are already likely correct from loop, but let's double check logic
+                        // actually the loop updates min/max dynamically.
+                    }
+
+                    populateYearOptions(minYear, maxYear, new Date().getFullYear());
+
+                    // Initial update for season availability based on selected year
+                    var currentY = parseInt(document.getElementById('cSelYear').dataset.value);
+                    updateSeasonAvailability(currentY);
+
+                    applyFilter();
+                })
+                .catch(function (err) {
+                    loadingText.innerHTML = '<span style="color:red">' + I18N[currentLang]['error'] + err.message + '</span>';
+                });
+        }
+
+        function detectLanguage() {
+            var lang = navigator.language || navigator.userLanguage;
+            if (!lang) return 'zh-Hans';
+            lang = lang.toLowerCase();
+            if (lang.startsWith('zh')) {
+                // zh-cn, zh-sg -> zh-Hans
+                // zh-tw, zh-hk -> zh-Hant
+                if (lang.indexOf('tw') !== -1 || lang.indexOf('hk') !== -1 || lang.indexOf('mo') !== -1) return 'zh-Hant';
+                return 'zh-Hans';
+            }
+            if (lang.startsWith('ja')) return 'ja';
+            if (lang.startsWith('en')) return 'en';
+            return 'zh-Hans'; // Fallback
+        }
+
+        function loadSettings() {
+            try {
+                var settings = JSON.parse(localStorage.getItem('bangumi_settings'));
+
+                // Load Logic: Settings > Browser > Default
+                if (settings && settings.lang) {
+                    currentLang = settings.lang;
+                } else {
+                    currentLang = detectLanguage();
+                }
+
+                // Update Select (old #selLang) and custom UI
+                // var selLang = document.getElementById('selLang'); // This line is no longer needed if #selLang is removed
+                // if (selLang) selLang.value = currentLang; // This line is no longer needed if #selLang is removed
+                initCustomLang(); // Update custom UI
+
+                updateUIText();
+
+                if (settings) {
+                    var btn30h = document.getElementById('btn30h');
+                    var btnRetain = document.getElementById('btnRetain');
+
+                    if (settings.is30h) {
+                        btn30h.classList.add('active');
+                        btnRetain.style.display = 'block';
+                    } else {
+                        btn30h.classList.remove('active');
+                        btnRetain.style.display = 'none';
+                    }
+
+                    if (settings.isRetain) {
+                        btnRetain.classList.add('active');
+                    } else {
+                        btnRetain.classList.remove('active');
+                    }
+
+                    if (settings.filterTypes) {
+                        filterTypes = settings.filterTypes;
+                        // Validate array
+                        if (!Array.isArray(filterTypes) || filterTypes.length === 0) filterTypes = ['tv', 'web'];
+                    }
+                    updateTypeSelectorUI();
+                }
+            } catch (e) {
+                console.error("Failed to load settings", e);
+                currentLang = detectLanguage(); // Fallback on error
+                updateUIText();
+            }
+        }
+
+        function saveSettings() {
+            var is30h = document.getElementById('btn30h').classList.contains('active');
+            var isRetain = document.getElementById('btnRetain').classList.contains('active');
+            var settings = { is30h: is30h, isRetain: isRetain, lang: currentLang, filterTypes: filterTypes };
+            localStorage.setItem('bangumi_settings', JSON.stringify(settings));
+        }
+
+        window.changeLanguage = function (lang) {
+            currentLang = lang;
+            updateUIText();
+            updateCustomLangUI(); // Sync the custom selector text/active state
+            updateTypeSelectorUI(); // Restore dynamic type label
+            saveSettings();
+            applyFilter(); // Re-render list for title translation
+        };
+
+        function updateUIText() {
+            var strings = I18N[currentLang];
+
+            // Translate static elements with data-i18n
+            // Translate static elements with data-i18n
+            document.querySelectorAll('[data-i18n]').forEach(function (el) {
+                var key = el.getAttribute('data-i18n');
+                if (strings[key]) {
+                    // Special handling for 30h button to append status
+                    if (key === 'btn_30h') {
+                        var isActive = document.getElementById('btn30h').classList.contains('active');
+                        var status = isActive ? strings['status_on'] : strings['status_off'];
+                        el.innerText = strings[key] + ": " + status;
+                    } else {
+                        el.innerText = strings[key];
+                    }
+                }
+            });
+
+            // Translate footer partial text (Manual handling due to link)
+            var footer = document.querySelector('.app-footer');
+            if (footer) {
+                // We only want to replace the text node before the link, but easier to rebuild or just use a span
+                // Let's wrapping the text in a span would be better but for now let's just update the textContent of the firstChild
+                if (footer.firstChild && footer.firstChild.nodeType === 3) {
+                    footer.firstChild.textContent = strings['footer_text'];
+                }
+            }
+
+            // Translate Season Select Options
+            var seasonContainer = document.getElementById('cSelSeason');
+            if (seasonContainer) {
+                var opts = seasonContainer.querySelectorAll('.c-select-option');
+                opts.forEach(function (opt, index) {
+                    // index 0 -> Winter
+                    opt.innerText = strings['months'][index] + " - " + strings['seasons'][index];
+                });
+                // Update trigger text for currently selected
+                var curVal = seasonContainer.dataset.value;
+                if (curVal) {
+                    // find text
+                    var t = strings['months'][curVal - 1] + " - " + strings['seasons'][curVal - 1];
+                    seasonContainer.querySelector('.c-select-trigger .val').innerText = t;
+                }
+            }
+
+            // Translate Year Select Options and Trigger
+            var yearContainer = document.getElementById('cSelYear');
+            if (yearContainer) {
+                var suffix = strings['year_suffix'] || '';
+                var yOpts = yearContainer.querySelectorAll('.c-select-option');
+                yOpts.forEach(function (opt) {
+                    var yVal = opt.dataset.v;
+                    opt.innerText = yVal + suffix;
+                });
+                // Update trigger
+                var curYVal = yearContainer.dataset.value;
+                if (curYVal) {
+                    yearContainer.querySelector('.c-select-trigger .val').innerText = curYVal + suffix;
+                }
+            }
+
+            // Translate Week Days in Nav
+            var navDays = document.querySelectorAll('.nav-day');
+            // Check if we have 7 days
+            if (navDays.length === 7) {
+                // Mon(1) -> strings.week_days[1]
+                navDays[0].innerText = strings['week_days'][1];
+                navDays[1].innerText = strings['week_days'][2];
+                navDays[2].innerText = strings['week_days'][3];
+                navDays[3].innerText = strings['week_days'][4];
+                navDays[4].innerText = strings['week_days'][5];
+                navDays[5].innerText = strings['week_days'][6];
+                navDays[6].innerText = strings['week_days'][0]; // Sun
+            }
+
+            // Translate Broadcast Description
+            var broadcastDiv = document.getElementById('broadcastControls');
+            if (broadcastDiv) {
+                broadcastDiv.innerText = strings['broadcast_desc'].replace('{{days}}', BROADCAST_DAYS);
+            }
+        }
+
+        function getTranslatedTitle(item) {
+            // 1. Japanese (Original Only for JA)
+            if (currentLang === 'ja') return item.title;
+
+            // 2. Exact Match
+            if (item.titleTranslate && item.titleTranslate[currentLang] && item.titleTranslate[currentLang].length > 0) {
+                return item.titleTranslate[currentLang][0];
+            }
+
+            // 3. Special Logic: zh-Hant Auto-Convert from zh-Hans
+            if (currentLang === 'zh-Hant') {
+                if (item.titleTranslate && item.titleTranslate['zh-Hans']) {
+                    var cn = item.titleTranslate['zh-Hans'][0];
+                    if (window.OpenCC) {
+                        if (!openccConverter) {
+                            openccConverter = OpenCC.Converter({ from: 'cn', to: 't' });
+                        }
+                        return openccConverter(cn);
+                    }
+                    return cn;
+                }
+            }
+
+            // 4. English Fallback: Avoid zh-Hans if currentLang is en
+            if (currentLang === 'en') {
+                // Try English -> then Original. DO NOT use Chinese.
+                if (item.titleTranslate && item.titleTranslate['en']) return item.titleTranslate['en'][0];
+                return item.title;
+            }
+
+            // 5. Default Fallback (for zh-Hans or others)
+            // Try zh-Hans
+            if (item.titleTranslate && item.titleTranslate['zh-Hans']) return item.titleTranslate['zh-Hans'][0];
+            // Try en
+            if (item.titleTranslate && item.titleTranslate['en']) return item.titleTranslate['en'][0];
+
+            return item.title;
+        }
+
+        window.setMode = function (mode) {
+            currentMode = mode;
+            document.getElementById('btnModeSeasonal').className = mode === 'seasonal' ? 'mode-btn active' : 'mode-btn';
+            document.getElementById('btnModeBroadcast').className = mode === 'broadcast' ? 'mode-btn active' : 'mode-btn';
+            document.getElementById('seasonalControls').style.display = mode === 'seasonal' ? 'flex' : 'none';
+            document.getElementById('broadcastControls').style.display = mode === 'broadcast' ? 'flex' : 'none';
+            applyFilter();
+        };
+
+        window.toggle30h = function () {
+            var btn = document.getElementById('btn30h');
+            btn.classList.toggle('active');
+            var is30h = btn.classList.contains('active');
+            document.getElementById('btnRetain').style.display = is30h ? 'block' : 'none';
+
+            // Update text state immediately
+            updateUIText();
+
+            applyFilter();
+            saveSettings();
+        };
+
+        window.toggleRetain = function () {
+            document.getElementById('btnRetain').classList.toggle('active');
+            applyFilter();
+            saveSettings();
+        };
+
+        window.applyFilter = function () {
+            if (!rawItems.length) return;
+
+            groupedData = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+            fullItemsMap = {};
+
+            var now = new Date();
+            var mondayDate = getWeekRange();
+
+            var filterStart, filterEnd;
+            if (currentMode === 'seasonal') {
+                var year = parseInt(document.getElementById('cSelYear').dataset.value);
+                var season = parseInt(document.getElementById('cSelSeason').dataset.value);
+                var startMonthIndex = (season - 1) * 3;
+                var qStart = new Date(year, startMonthIndex, 1);
+                var qEnd = new Date(year, startMonthIndex + 3, 0);
+                filterStart = new Date(qStart.getTime() - SEASON_TOLERANCE * 24 * 3600 * 1000);
+                filterEnd = new Date(qEnd.getTime() + SEASON_TOLERANCE * 24 * 3600 * 1000);
+            } else {
+                filterStart = new Date(now.getTime() - BROADCAST_DAYS * 24 * 3600 * 1000);
+            }
+
+            var is30h = document.getElementById('btn30h').classList.contains('active');
+            var isRetain = document.getElementById('btnRetain').classList.contains('active');
+
+            // Logic for "gray out": If start date is after this week's Sunday.
+            // mondayDate is 00:00 of this week's Monday.
+            // Next Monday 00:00 is the cutoff.
+            var nextMondayTime = mondayDate.getTime() + 7 * 24 * 60 * 60 * 1000;
+
+            rawItems.forEach(function (item, index) {
+                try {
+                    // Allow based on filterTypes
+                    // if (item.type !== 'tv' && item.type !== 'web' && item.type !== 'movie' && item.type !== 'ova') return;
+
+                    var t = item.type;
+                    if (filterTypes.indexOf(t) === -1) return;
+
+                    var dateStr = "";
+                    if (item.broadcast) {
+                        var parts = item.broadcast.split('/');
+                        if (parts.length >= 2) dateStr = parts[1];
+                    }
+                    if (!dateStr || dateStr.indexOf('-') === -1) dateStr = item.begin;
+                    if (!dateStr) return;
+
+                    var dateObj = new Date(dateStr);
+                    if (isNaN(dateObj.getTime())) return;
+
+                    var isMatch = false;
+                    if (currentMode === 'seasonal') {
+                        if (dateObj >= filterStart && dateObj <= filterEnd) isMatch = true;
+                    } else {
+                        var notEnded = !item.end || new Date(item.end) >= now;
+                        var isRecent = dateObj >= filterStart;
+                        if (notEnded && isRecent) isMatch = true;
+                    }
+
+                    if (!isMatch) return;
+
+                    var processingList = []; // Array of { dateObj, displayTime, dayOfWeek }
+
+                    // Default entry
+                    processingList.push({
+                        dateObj: dateObj,
+                        displayTime: dateObj.getHours().toString().padStart(2, '0') + ":" + dateObj.getMinutes().toString().padStart(2, '0'),
+                        realDay: dateObj.getDay(),
+                        is30hShifted: false
+                    });
+
+                    // 30h Logic
+                    if (is30h && dateObj.getHours() < 6) {
+                        // It fits 30h criteria (00:00 - 05:59)
+
+                        // Create shifted entry (previous day)
+                        var shiftedTimeStr = (dateObj.getHours() + 24) + ":" + dateObj.getMinutes().toString().padStart(2, '0');
+                        // Calculate previous day index
+                        var currentDay = dateObj.getDay();
+                        var prevDay = (currentDay === 0) ? 6 : currentDay - 1;
+
+                        processingList.push({
+                            dateObj: dateObj,
+                            displayTime: shiftedTimeStr,
+                            realDay: prevDay, // Force bucket to previous day
+                            is30hShifted: true
+                        });
+
+                        // Remove original entry if retention is OFF
+                        if (!isRetain) {
+                            processingList.shift(); // Remove the regular one
+                        }
+                    }
+
+                    processingList.forEach(function (pItem) {
+                        var title = getTranslatedTitle(item);
+
+                        var dayOfWeek = pItem.realDay;
+
+                        // New future logic: purely based on waiting for premiere in NEXT week
+                        var isFuture = pItem.dateObj.getTime() >= nextMondayTime;
+
+                        // Sort Key
+                        var h = parseInt(pItem.displayTime.split(':')[0]);
+                        var m = parseInt(pItem.displayTime.split(':')[1]);
+                        var sortKey = h * 60 + m;
+
+                        item._uid = index;
+                        fullItemsMap[index] = item;
+
+                        groupedData[dayOfWeek].push({
+                            title: title,
+                            time: pItem.displayTime,
+                            sortKey: sortKey,
+                            uid: index,
+                            isFuture: isFuture
+                        });
+                    });
+
+                } catch (e) { }
+            });
+
+            renderUI();
+        };
+
+        function renderUI() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('navDays').style.display = 'flex';
+            var container = document.getElementById('listContainer');
+            container.innerHTML = "";
+
+            var now = new Date();
+            var todayIndex = now.getDay();
+            var currentMinutes = now.getHours() * 60 + now.getMinutes();
+            // Since we can have 26:00, we might need adjustments if we wanted "NOW" line to work perfectly for 30h, 
+            // but for now let's keep it simple. If 30h is active, "NOW" line only makes sense if we also shifted "NOW"?
+            // Or just leave it as standard time indication.
+
+            var is30h = document.getElementById('btn30h').classList.contains('active');
+            if (is30h && now.getHours() < 6) {
+                // Adjust "now" for sorting comparison if needed, but the line rendering relies on strict match?
+                // The original code: anime.sortKey > currentMinutes
+                // If current time is 01:00 (sortKey 60). Items in Monday group are 25:00 (sortKey 1500).
+                // 1500 > 60. So "NOW" line would appear at top?
+                // Actually todayIndex is Tuesday(2). Group is Monday(1).
+                // So "NOW" line won't appear in Monday group.
+                // It will appear in Tuesday group. But Tuesday items are gone (or retained).
+                // It is acceptable behavior.
+            }
+
+            for (var i = 0; i <= 6; i++) {
+                groupedData[i].sort(function (a, b) { return a.sortKey - b.sortKey; });
+                var groupDiv = document.createElement('div');
+                groupDiv.className = 'schedule-group';
+                groupDiv.id = 'group-' + i;
+
+                if (groupedData[i].length === 0) {
+                    groupDiv.innerHTML = '<div style="padding:20px; text-align:center; color:#555;">' + I18N[currentLang]['no_data'] + '</div>';
+                } else {
+                    var html = '';
+                    var timelineInserted = false;
+
+                    groupedData[i].forEach(function (anime) {
+                        if (i === todayIndex && !timelineInserted && anime.sortKey > currentMinutes) {
+                            html += '<div class="timeline-separator"><span>' + I18N[currentLang]['now'] + '</span></div>';
+                            timelineInserted = true;
+                        }
+                        var itemClass = 'anime-item';
+                        if (anime.isFuture) itemClass += ' future-ep';
+
+                        html += '<div class="' + itemClass + '" onclick="openDetail(' + anime.uid + ')">' +
+                            '<span class="anime-time">' + anime.time + '</span>' +
+                            '<span class="anime-title">' + anime.title + '</span>' +
+                            '</div>';
+                    });
+
+                    if (i === todayIndex && !timelineInserted && groupedData[i].length > 0) {
+                        html += '<div class="timeline-separator"><span>' + I18N[currentLang]['ended'] + '</span></div>';
+                    }
+                    groupDiv.innerHTML = html;
+                }
+                container.appendChild(groupDiv);
+            }
+
+            switchDay(new Date().getDay());
+        }
+
+        window.switchDay = function (dayIndex) {
+            var tabs = document.querySelectorAll('.nav-day');
+            for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+            var domIndex = dayIndex === 0 ? 6 : dayIndex - 1;
+            if (tabs[domIndex]) tabs[domIndex].classList.add('active');
+
+            var groups = document.querySelectorAll('.schedule-group');
+            for (var j = 0; j < groups.length; j++) groups[j].classList.remove('active');
+            var target = document.getElementById('group-' + dayIndex);
+            if (target) target.classList.add('active');
+        };
+
+        window.openDetail = function (uid) {
+            var item = fullItemsMap[uid];
+            if (!item) return;
+            var modal = document.getElementById('modalOverlay');
+            var mTitle = document.getElementById('mTitle');
+            var mDesc = document.getElementById('mDesc');
+            var mCover = document.getElementById('mCover');
+            var mButtons = document.getElementById('mButtons');
+            var mMeta = document.getElementById('mMeta');
+
+            var title = item.title;
+            if (item.titleTranslate && item.titleTranslate['zh-Hans']) title = item.titleTranslate['zh-Hans'][0];
+
+            mTitle.innerText = title;
+            mDesc.innerText = I18N[currentLang]['loading'];
+            mMeta.innerText = I18N[currentLang]['modal_begin'] + (item.begin ? item.begin.substring(0, 10) : I18N[currentLang]['unknown']);
+            mCover.src = "https://bgm.tv/img/no_icon_subject.png";
+
+            var btnsHtml = "";
+
+            // 1. 官方网站
+            if (item.officialSite) {
+                btnsHtml += '<a href="' + item.officialSite + '" target="_blank" class="btn">' + I18N[currentLang]['modal_official'] + '</a>';
+            }
+
+            // 2. Bangumi 独立按钮 (回归)
+            var bgmSite = item.sites ? item.sites.find(function (s) { return s.site === 'bangumi' }) : null;
+            if (bgmSite && bgmSite.id) {
+                btnsHtml += '<a href="https://bgm.tv/subject/' + bgmSite.id + '" target="_blank" class="btn btn-bangumi">Bangumi</a>';
+
+                // 获取详情
+                fetch('https://api.bgm.tv/v0/subjects/' + bgmSite.id)
+                    .then(function (r) { return r.json() })
+                    .then(function (d) {
+                        if (d.images && d.images.large) mCover.src = d.images.large;
+                        else if (d.images && d.images.common) mCover.src = d.images.common;
+                        mDesc.innerText = d.summary || "暂无简介";
+                        if (d.rating && d.rating.score) mMeta.innerText += " | " + I18N[currentLang]['rating_label'] + ": " + d.rating.score;
+                    }).catch(function () { mDesc.innerText = I18N[currentLang]['error']; });
+            } else {
+                mDesc.innerText = "暂无 Bangumi 数据"; // Keep as is for specific unavailable
+            }
+
+            // 3. 其他播放源
+            if (item.sites) {
+                item.sites.forEach(function (site) {
+                    var meta = SITE_META[site.site];
+                    if (meta) {
+                        var url = meta.urlTemplate.replace("{{id}}", site.id);
+                        var cssClass = meta.css ? "btn " + meta.css : "btn";
+                        btnsHtml += '<a href="' + url + '" target="_blank" class="' + cssClass + '">' + meta.title + '</a>';
+                    }
+                });
+            }
+
+            mButtons.innerHTML = btnsHtml;
+            modal.style.display = 'flex';
+        };
+
+        window.closeModal = function (e) {
+            if (!e || e.target.id === 'modalOverlay' || e.target.className === 'modal-close')
+                document.getElementById('modalOverlay').style.display = 'none';
+        };
+
+        init();
+    </script>
+</body>
+
+</html>
